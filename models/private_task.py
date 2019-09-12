@@ -1,6 +1,7 @@
 from models.base_model import BaseModel
 import peewee as pw
 from models.user import User
+import datetime
 
 class PrivateTask(BaseModel):
     user = pw.ForeignKeyField(User, backref='user_tasks')
@@ -14,3 +15,10 @@ class PrivateTask(BaseModel):
 
         if len(self.name) == 0:
             self.errors.append('Task is empty')
+        
+        datetime_string = self.completed_by
+        datetime_format = '%Y-%m-%d %H:%M:%S'
+        try:
+            date_obj = datetime.datetime.strptime(datetime_string, datetime_format)
+        except ValueError:
+            self.errors.append('Wrong format for datetime input')

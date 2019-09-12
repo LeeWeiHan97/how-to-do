@@ -6,6 +6,7 @@ from models.room import Room
 import string
 import random
 from models.private_task import PrivateTask
+from models.public_task import PublicTask
 
 
 users_api_blueprint = Blueprint('users_api',
@@ -216,4 +217,24 @@ def complete_private_task():
             "error": "Do not try to edit other's personnal tasks!"
         }
 
+    return jsonify (response)
+
+
+@users_api_blueprint.route('/newpublictask', methods=['POST'])
+@jwt_required
+def new_public_task():
+    name = request.json.get('task')
+    description = request.json.get('description')
+    completed_by = request.json.get('completed_by')
+    public_task_create = PublicTask(name=name, description=description, completed_by=completed_by)
+    if public_task_create.save():
+        response = {
+            "status": "success"
+        }
+    else:
+        response = {
+            "status": "failed",
+            "errors": ', '.join(public_task_create.errors)
+        }
+    
     return jsonify (response)
