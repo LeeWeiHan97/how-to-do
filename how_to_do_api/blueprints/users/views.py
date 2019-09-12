@@ -5,6 +5,8 @@ from models.user import User
 from models.room import Room
 import string
 import random
+from models.private_task import PrivateTask
+
 
 users_api_blueprint = Blueprint('users_api',
                              __name__,
@@ -23,18 +25,18 @@ def create():
         if user_create.save():
             response = {
                 "status": "success",
-            }, 200
+            }
         else:
             response = {
                 "status": "failed",
                 "errors": ', '.join(user_create.errors)
-            }, 400
+            }
         return jsonify (response)
     else:
         response = {
             "status": "failed",
             "errors": ', '.join(user_create.errors)
-        }, 400
+        }
         return jsonify (response)
 
 
@@ -51,17 +53,15 @@ def login():
                 "user_id": user.id,
                 "jwt_token": jwt_token
             }, 200
-        else:
-            response = {
-                "status": "failed",
-                "error": "Username or password incorrect"
-            }, 400
-        return jsonify (response)
+
+            return jsonify (response)
+
     response = {
         "status": "failed",
-        "error": "User does not exist"
+        "error": "Username or password incorrect"
     }
-    return (response)
+    return jsonify (response)
+
 
 
 @users_api_blueprint.route('/', methods=['GET'])
@@ -70,7 +70,7 @@ def users():
     response = {
         "status": "success",
         "users": [user.id for user in users]
-    }, 200
+    }
 
     return jsonify (response)
 
@@ -85,12 +85,12 @@ def user(user_id):
             "name": user.name,
             "username": user.username,
             "email": user.email,
-        }, 200
+        }
     else:
         response = {
             "status": "failed",
             "error": "User not found"
-        }, 400
+        }
     
     return jsonify (response)
 
@@ -105,7 +105,7 @@ def me():
             "name": user.name,
             "username": user.username,
             "email": user.email,
-        }, 200
+        }
     
     return jsonify (response)
 
@@ -115,14 +115,15 @@ def me():
 def join():
     current_user_id = get_jwt_identity()
     user = User.get_by_id(current_user_id)
-    room_id = request.json.get('room_id')
+    roomID = request.json.get('room_id')
     rooms = Room.select()
     for room in rooms:
-        if room_id == room.name:
-            User.update(room_id=room_id).where(User.id == user.id).execute()
+        if roomID == room.id:
+            user.room_id = room.id
+            user.save()
             response = {
                 "status": "success"
-            }, 200
+            }
             return jsonify (response)
 
     response = {
@@ -152,7 +153,67 @@ def new_room():
 
     return jsonify (response)
 
-        
-        
-        
 
+@users_api_blueprint.route('/newprivatetask', methods=['POST'])
+@jwt_required
+def new_private_task():
+    current_user_id = get_jwt_identity()
+    user = User.get_by_id(current_user_id)
+    name = request.json.get('name')
+    description = request.json.get('description')
+    completed_by = request.json.get('completed_by')
+    private_task_create = PrivateTask(user_id=user.id, name=name, description=description, completed_by=completed_by)
+    if private_task_create.save():
+        response = {
+            "status": "success"
+        }
+    else:
+        response = {
+            "status": "failed",
+            "errors": ', '.join(private_task_create.errors)
+        }
+
+    return jsonify (response)
+    
+
+@users_api_blueprint.route('/deleteprivatetask', methods=['POST'])
+@jwt_required
+def delete_private_task():
+    current_user_id = get_jwt_identity()
+    user = User.get_by_id(current_user_id)
+    task_id = request.json.get('task_id')
+    task = PrivateTask.get_by_id(task_id)
+    if task.user_id == current_user_id:
+        task_to_delete = PrivateTask.delete().where(PrivateTask.id == task_id).execute()
+        response = {
+            "status": "successfully deleted"
+        }
+    else:
+        response = {
+            "status": "failed",
+            "error": "Do not try to delete other's personnal tasks!"
+        }
+
+    return jsonify (response)
+
+
+@users_api_blueprint.route('/completeprivatetask', methods=['POST'])
+@jwt_required
+def complete_private_task():
+    current_user_id = get_jwt_identity()
+    user = User.get_by_id(current_user_id)
+    task_id = request.json.get('task_id')
+    task = PrivateTask.get_by_id(task_id)
+    if task.user_id == current_user_id:
+        task.is_completed = True
+        task.save()
+        response = {
+            "status": "success"
+        }
+    else:
+        response = {
+            "status": "failed",
+            "error": "Do not try to edit other's personnal tasks!"
+        }
+
+    return jsonify (response)
