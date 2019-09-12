@@ -8,6 +8,7 @@ import random
 from models.private_task import PrivateTask
 from models.public_category import PublicCategory
 from models.task import Task
+from models.scheduled_task import Scheduled
 
 
 users_api_blueprint = Blueprint('users_api',
@@ -377,6 +378,23 @@ def add():
     return jsonify (response)  
 
 
-# @users_api_blueprint.route('/new_scheduled', methods=['POST'])
-# @jwt_required
-# def new_scheduled():
+@users_api_blueprint.route('/new_scheduled', methods=['POST'])
+@jwt_required
+def new_scheduled():
+    current_user_id = get_jwt_identity()
+    user = User.get_by_id(current_user_id)
+    name = request.json.get('task')
+    date_time = request.json['datetime']
+    roomID = user.room_id
+    new_scheduled = Scheduled(name=name, date_time=date_time, room_id=roomID)
+    if new_scheduled.save():
+        response = {
+            "status": "success"
+        }
+    else:
+        response = {
+            "status": "failed",
+            "errors": ', '.join(new_scheduled.errors)
+        }
+    
+    return jsonify (response)

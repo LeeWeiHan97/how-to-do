@@ -11,8 +11,6 @@ class PrivateTask(BaseModel):
     is_completed = pw.BooleanField(default=False)
 
     def validate(self):
-        private_task = PrivateTask.get_or_none(PrivateTask.id == self.id)
-
         if len(self.name) == 0:
             self.errors.append('Task is empty')
         

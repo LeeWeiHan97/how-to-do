@@ -13,8 +13,6 @@ class PublicCategory(BaseModel):
     room = pw.ForeignKeyField(Room, backref="room_public_tasks", null=False)
 
     def validate(self):
-        public_category = PublicCategory.get_or_none(PublicCategory.id == self.id)
-
         if len(self.name) == 0:
             self.errors.append('Task is empty')
 

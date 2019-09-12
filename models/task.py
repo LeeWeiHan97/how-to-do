@@ -10,7 +10,5 @@ class Task(BaseModel):
     created_by = pw.ForeignKeyField(User, backref="user_created_tasks")
  
     def validate(self):
-        task = Task.get_or_none(Task.id == self.id)
-
         if len(self.name) == 0:
             self.errors.append('Name is empty')
