@@ -6,7 +6,8 @@ from models.room import Room
 import string
 import random
 from models.private_task import PrivateTask
-from models.public_task import PublicTask
+from models.public_category import PublicCategory
+from models.task import Task
 
 
 users_api_blueprint = Blueprint('users_api',
@@ -261,16 +262,37 @@ def complete_private_task():
     return jsonify (response)
 
 
+@users_api_blueprint.route('/newpubliccategory', methods=['POST'])
+@jwt_required
+def new_public_category():
+    current_user_id = get_jwt_identity()
+    user = User.get_by_id(current_user_id)
+    name = request.json.get('category')
+    description = request.json.get('description')
+    completed_by = request.json.get('completed_by')
+    roomID = user.room_id
+    public_category_create = PublicCategory(name=name, description=description, completed_by=completed_by, created_by_id=current_user_id, room_id= roomID)
+    if public_category_create.save():
+        response = {
+            "status": "success"
+        }
+    else:
+        response = {
+            "status": "failed",
+            "errors": ', '.join(public_category_create.errors)
+        }
+    
+    return jsonify (response)
+
+
 @users_api_blueprint.route('/newpublictask', methods=['POST'])
 @jwt_required
 def new_public_task():
     current_user_id = get_jwt_identity()
     user = User.get_by_id(current_user_id)
     name = request.json.get('task')
-    description = request.json.get('description')
-    completed_by = request.json.get('completed_by')
-    roomID = user.room_id
-    public_task_create = PublicTask(name=name, description=description, completed_by=completed_by, created_by_id=current_user_id, room_id= roomID)
+    category_id = request.json.get('category_id')
+    public_task_create = Task(name=name, created_by=current_user_id, public_category=category_id)
     if public_task_create.save():
         response = {
             "status": "success"
@@ -278,19 +300,31 @@ def new_public_task():
     else:
         response = {
             "status": "failed",
-            "errors": ', '.join(public_task_create.errors)
+            "errors": ', '.join(public_category_create.errors)
         }
     
     return jsonify (response)
 
 
-@users_api_blueprint.route('/pickup', methods=['POST'])
+@users_api_blueprint.route('/completepublictask', methods=['POST'])
 @jwt_required
-def pickup():
-    current_user_id = get_jwt_identity()
-    user = User.get_by_id(current_user_id)
-    task_id = request.json.get("task_id")
-    PublicTask.update(user_incharge_id=current_user_id).where(PublicTask.id == task_id).execute()
+def complete_public_task():
+    task_id = request.json.get('task_id')
+    task = Task.get_by_id(task_id)
+    task.is_completed = True
+    task.save()
+    response = {
+        "status": "success"
+    }
+
+    return jsonify (response)
+
+
+@users_api_blueprint.route('/completepubliccategory', methods=['POST'])
+@jwt_required
+def complete_public_category():
+    category_id = request.json.get('category_id')
+    PublicCategory.update(is_completed = True).where(PublicCategory.id == category_id).execute()
     response = {
         "status": "success"
     }
@@ -341,3 +375,8 @@ def add():
         }
 
     return jsonify (response)  
+
+
+# @users_api_blueprint.route('/new_scheduled', methods=['POST'])
+# @jwt_required
+# def new_scheduled():
