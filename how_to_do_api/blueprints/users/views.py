@@ -155,6 +155,35 @@ def new_room():
     return jsonify (response)
 
 
+@users_api_blueprint.route('/deleteroom', methods=['POST'])
+@jwt_required
+def delete_room():
+    current_user_id = get_jwt_identity()
+    user = User.get_by_id(current_user_id)
+    roomId = request.json.get('room_id')
+    room = Room.get_or_none(Room.id == roomId)
+    if room and user.room.id == roomId:
+        if user.is_admin == True:
+            room_to_delete = Room.delete().where(Room.id == roomId).execute()
+            response = {
+                "status": "success"
+            }
+        else:
+            response = {
+                "status": "failed",
+                "error": "You are not the admin!"
+            }
+        
+        return jsonify (response)
+    else:
+        response = {
+            "status": "failed",
+            "error": "Either room id mismatch or room does not exist!"
+        }
+
+        return jsonify (response)
+
+
 @users_api_blueprint.route('/newprivatetask', methods=['POST'])
 @jwt_required
 def new_private_task():
@@ -238,3 +267,50 @@ def new_public_task():
         }
     
     return jsonify (response)
+
+
+@users_api_blueprint.route('/kick', methods=['POST'])
+@jwt_required
+def kick():
+    current_user_id = get_jwt_identity()
+    user = User.get_by_id(current_user_id)
+    kick_id = request.json.get('kicked_id')
+    if user.is_admin == True:
+        user_to_remove = User.get_by_id(kick_id)
+        user_to_remove.room_id = None
+        user_to_remove.save()
+        response = {
+            "status": "success"
+        }
+    else:
+        response = {
+            "status": "failed",
+            "error": "You are not the admin!"
+        }
+
+    return jsonify (response)
+
+
+@users_api_blueprint.route('/add', methods=['POST'])
+@jwt_required
+def add():
+    current_user_id = get_jwt_identity()
+    user = User.get_by_id(current_user_id)
+    add_id = request.json.get('add_id')
+    current_room_id = user.room_id
+    if user.is_admin == True:
+        user_to_add = User.get_by_id(add_id)
+        user_to_add.room_id = current_room_id
+        user_to_add.save()
+        response = {
+            "status": "success"
+        }
+    else:
+          response = {
+            "status": "failed",
+            "error": "You are not the admin!"
+        }
+
+    return jsonify (response)  
+
+
