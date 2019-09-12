@@ -2,13 +2,15 @@ from models.base_model import BaseModel
 import peewee as pw
 from models.user import User
 import datetime
+from models.room import Room
 
 class PublicTask(BaseModel):
     name = pw.CharField(unique=False, null=False)
     description = pw.CharField(unique=False, null=True)
     completed_by = pw.DateTimeField(null=False, unique=False)
     is_completed = pw.BooleanField(default=False)
-    individual_completed = pw.IntegerField(unique=False, null=True)
+    user = pw.ForeignKeyField(User, backref="user_public_tasks", null=True, on_delete="SET NULL")
+    room = pw.ForeignKeyField(Room, backref="room_public_tasks", null=True, on_delete="SET NULL")
 
     def validate(self):
         public_task = PublicTask.get_or_none(PublicTask.id == self.id)

@@ -76,6 +76,33 @@ def users():
     return jsonify (response)
 
 
+@users_api_blueprint.route('/housemates', methods=['GET'])
+def housemates():
+    roomID = request.json.get('room_id')
+    users = User.select().where(User.room_id == roomID)
+    response = {
+        "status": "success",
+        "users": [user.id for user in users],
+    }
+
+    return jsonify (response)
+
+
+@users_api_blueprint.route('/me', methods=['GET'])
+@jwt_required
+def me():
+    current_user_id = get_jwt_identity()
+    user = User.get_by_id(current_user_id)
+    response = {
+            "id": user.id,
+            "name": user.name,
+            "username": user.username,
+            "email": user.email,
+        }
+    
+    return jsonify (response)
+
+
 @users_api_blueprint.route('/<user_id>', methods=['GET'])
 def user(user_id):
     user = User.get_or_none(User.id == user_id)
@@ -91,21 +118,6 @@ def user(user_id):
         response = {
             "status": "failed",
             "error": "User not found"
-        }
-    
-    return jsonify (response)
-
-
-@users_api_blueprint.route('/me', methods=['GET'])
-@jwt_required
-def me():
-    current_user_id = get_jwt_identity()
-    user = User.get_by_id(current_user_id)
-    response = {
-            "id": user.id,
-            "name": user.name,
-            "username": user.username,
-            "email": user.email,
         }
     
     return jsonify (response)
