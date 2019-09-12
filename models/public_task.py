@@ -9,8 +9,9 @@ class PublicTask(BaseModel):
     description = pw.CharField(unique=False, null=True)
     completed_by = pw.DateTimeField(null=False, unique=False)
     is_completed = pw.BooleanField(default=False)
-    user = pw.ForeignKeyField(User, backref="user_public_tasks", null=True, on_delete="SET NULL")
-    room = pw.ForeignKeyField(Room, backref="room_public_tasks", null=True, on_delete="SET NULL")
+    created_by = pw.ForeignKeyField(User, backref="user_created_public_tasks", null=False)
+    user_incharge = pw.ForeignKeyField(User, backref="user_taking_on_public_tasks", null=True, on_delete="SET NULL")
+    room = pw.ForeignKeyField(Room, backref="room_public_tasks", null=False)
 
     def validate(self):
         public_task = PublicTask.get_or_none(PublicTask.id == self.id)

@@ -264,10 +264,13 @@ def complete_private_task():
 @users_api_blueprint.route('/newpublictask', methods=['POST'])
 @jwt_required
 def new_public_task():
+    current_user_id = get_jwt_identity()
+    user = User.get_by_id(current_user_id)
     name = request.json.get('task')
     description = request.json.get('description')
     completed_by = request.json.get('completed_by')
-    public_task_create = PublicTask(name=name, description=description, completed_by=completed_by)
+    roomID = user.room_id
+    public_task_create = PublicTask(name=name, description=description, completed_by=completed_by, created_by_id=current_user_id, room_id= roomID)
     if public_task_create.save():
         response = {
             "status": "success"
@@ -278,6 +281,20 @@ def new_public_task():
             "errors": ', '.join(public_task_create.errors)
         }
     
+    return jsonify (response)
+
+
+@users_api_blueprint.route('/pickup', methods=['POST'])
+@jwt_required
+def pickup():
+    current_user_id = get_jwt_identity()
+    user = User.get_by_id(current_user_id)
+    task_id = request.json.get("task_id")
+    PublicTask.update(user_incharge_id=current_user_id).where(PublicTask.id == task_id).execute()
+    response = {
+        "status": "success"
+    }
+
     return jsonify (response)
 
 
@@ -324,5 +341,3 @@ def add():
         }
 
     return jsonify (response)  
-
-
