@@ -9,8 +9,8 @@ class PublicCategory(BaseModel):
     description = pw.CharField(unique=False, null=True)
     completed_by = pw.DateTimeField(null=False, unique=False)
     is_completed = pw.BooleanField(default=False)
-    created_by = pw.ForeignKeyField(User, backref="user_created_public_tasks", null=False)
-    room = pw.ForeignKeyField(Room, backref="room_public_tasks", null=False)
+    created_by = pw.ForeignKeyField(User, backref="user_created_public_tasks", null=False, on_delete="CASCADE")
+    room = pw.ForeignKeyField(Room, backref="room_public_tasks", null=False, on_delete="CASCADE")
 
     def validate(self):
         if len(self.name) == 0:

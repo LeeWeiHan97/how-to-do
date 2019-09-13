@@ -8,8 +8,8 @@ class Scheduled(BaseModel):
     name = pw.CharField(unique=False, null=False) 
     is_completed = pw.BooleanField(default=False)
     date_time = pw.DateTimeField(null=False, unique=False)
-    user_incharge = pw.ForeignKeyField(User, backref="user_scheduled_tasks", null=True)
-    room = pw.ForeignKeyField(Room, backref="room_scheduled_tasks", null=False)
+    user_incharge = pw.ForeignKeyField(User, backref="user_scheduled_tasks", null=True, on_delete="CASCADE")
+    room = pw.ForeignKeyField(Room, backref="room_scheduled_tasks", null=False, on_delete="CASCADE")
     
     def validate(self):
         if len(self.name) == 0:

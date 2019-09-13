@@ -9,11 +9,26 @@ from models.private_task import PrivateTask
 from models.public_category import PublicCategory
 from models.task import Task
 from models.scheduled_task import Scheduled
+from pyfcm import FCMNotification
+import os
 
 
 users_api_blueprint = Blueprint('users_api',
                              __name__,
                              template_folder='templates')
+
+push_service = FCMNotification(api_key=os.environ.get("FCM_API_KEY"))
+
+def notification(registrationId, title, body):
+    registration_id = registrationId
+    message_title = title
+    message_body = body
+    if type(registrationId) == str:
+        result = push_service.notify_single_device(registration_id=registration_id, message_title=message_title, message_body=message_body)
+    elif type(registrationId) == list:
+        result = push_service.notify_multiple_devices(registration_ids=registration_id, message_title=message_title, message_body=message_body)
+    else:
+        raise Exception('registration id should be a string or a list of strings')
 
 
 @users_api_blueprint.route('/signup', methods=['POST'])
@@ -22,8 +37,9 @@ def create():
     email = request.json.get('email')
     password = request.json.get('password')
     confirmed_password = request.json.get('confirmed_password')
+    android_token = request.json.get('android_token')
     if password == confirmed_password:
-        user_create = User(username=username, email=email, password=password)
+        user_create = User(username=username, email=email, password=password, android_token=android_token)
         if user_create.save():
             response = {
                 "status": "success",
@@ -37,7 +53,7 @@ def create():
     else:
         response = {
             "status": "failed",
-            "errors": ', '.join(user_create.errors)
+            "errors": "password and confirmed password not the same"
         }
         return jsonify (response)
 
@@ -50,11 +66,19 @@ def login():
     for user in users:
         if username == user.username and password == user.password:
             jwt_token = create_access_token(identity=user.id)
-            response = {
-                "status": "success",
-                "user_id": user.id,
-                "jwt_token": jwt_token
-            }, 200
+            android_token = request.json.get('android_token')
+            user.android_token = android_token
+            if user.save():
+                response = {
+                    "status": "success",
+                    "user_id": user.id,
+                    "jwt_token": jwt_token
+                }
+            else:
+                response = {
+                    "status": "failed",
+                    "errors": ", ".join(user.errors)
+                }
 
             return jsonify (response)
 
@@ -129,21 +153,37 @@ def join():
     user = User.get_by_id(current_user_id)
     roomID = request.json.get('room_id')
     rooms = Room.select()
-    for room in rooms:
-        if roomID == room.id:
-            user.room_id = room.id
-            user.save()
-            response = {
-                "status": "success"
-            }
-            return jsonify (response)
 
-    response = {
-        "status": "failed",
-        "error": "Room does not exist"
-    }
+    if user.room_id != roomID:
+        for room in rooms:
+            if roomID == room.id:
+                users_in_room = User.select().where(User.room_id == roomID)
+                registration_id = [user.android_token for user in users_in_room]
+                title = f"{user.username} has joined your group!"
+                body="Gang gang gang!"
+                notification(registration_id, title, body)
 
-    return jsonify (response)
+                user.room_id = room.id
+                user.save()
+
+                response = {
+                    "status": "success"
+                }
+                return jsonify (response)
+
+        response = {
+            "status": "failed",
+            "error": "Room does not exist"
+        }
+
+        return jsonify (response)
+    else:
+        response = {
+            "status": "failed",
+            "error": "user already in the room!"
+        }
+
+        return jsonify (response)
 
 
 @users_api_blueprint.route('/create', methods=['POST'])
@@ -151,17 +191,31 @@ def join():
 def new_room():
     current_user_id = get_jwt_identity()
     user = User.get_by_id(current_user_id)
-    room_create = Room(name=f"{user.username}'s room").save()
-    room = Room.get_or_none(Room.name==f"{user.username}'s room")
-    user.is_admin = True
-    user.room_id = room.id
-    user.save()
 
-    response = {
-        "status": "success",
-        "room_id": room.id,
-        "room_name": room.name
-    }
+    if user.is_admin == False:
+        room_create = Room(name=f"{user.username}'s room").save()
+        room = Room.get_or_none(Room.name==f"{user.username}'s room")
+        user.is_admin = True
+        user.room_id = room.id
+
+        if user.save():
+            response = {
+                "status": "success",
+                "room_id": room.id,
+                "room_name": room.name
+            }
+        else:
+            response = {
+                "status": "failed",
+                "error": ", ".join(user.errors)
+            }
+
+        return jsonify (response)
+    else:
+        response = {
+            "status": "failed",
+            "error": "user has already created a room, please leave the room before creating a new one!"
+        }
 
     return jsonify (response)
 
@@ -395,3 +449,17 @@ def new_scheduled():
         }
     
     return jsonify (response)
+
+
+@users_api_blueprint.route('/notification', methods=['POST'])
+def notifications():
+    notification("cXCOU_0R6cs:APA91bG1bTMINOY91tqaaEvx13ha4OrymlRR7kX5fOcTLRZ2OEIGp8s6uS2URSmlBYRuCywrcoTcWnUt-veK3TLPqcpMyOlfU1BSpHaGvzq3sd-AQC1F1n3_B5EDgYxFiqZ8e0smfgA9", "test title", "test body")
+
+    response = {
+        "status": "success"
+    }
+
+    return jsonify (response)
+
+
+

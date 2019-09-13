@@ -4,7 +4,7 @@ from models.user import User
 import datetime
 
 class PrivateTask(BaseModel):
-    user = pw.ForeignKeyField(User, backref='user_tasks')
+    user = pw.ForeignKeyField(User, backref='user_tasks', on_delete="CASCADE")
     description = pw.CharField(null=True, unique=False)
     name = pw.CharField(null=False, unique=False)
     completed_by = pw.DateTimeField(null=False, unique=False)
