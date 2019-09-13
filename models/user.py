@@ -5,7 +5,6 @@ import re
 
 
 class User(BaseModel):
-    name = pw.CharField(unique=False, null=False)
     username = pw.CharField(unique=True, null=False)
     password = pw.CharField(null=False)
     email = pw.CharField(unique=True, null=False)
@@ -15,8 +14,6 @@ class User(BaseModel):
     def validate(self):
         user = User.get_or_none(User.username == self.username)
 
-        if len(self.name) == 0:
-            self.errors.append('Name is empty')
         if len(self.email) == 0:
             self.errors.append('Email is empty')
         if len(self.password) == 0:

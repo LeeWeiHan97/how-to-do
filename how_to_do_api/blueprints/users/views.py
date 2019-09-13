@@ -18,13 +18,12 @@ users_api_blueprint = Blueprint('users_api',
 
 @users_api_blueprint.route('/signup', methods=['POST'])
 def create():
-    name = request.json.get('name')
     username = request.json.get('username')
     email = request.json.get('email')
     password = request.json.get('password')
     confirmed_password = request.json.get('confirmed_password')
     if password == confirmed_password:
-        user_create = User(name=name, username=username, email=email, password=password)
+        user_create = User(username=username, email=email, password=password)
         if user_create.save():
             response = {
                 "status": "success",
@@ -97,7 +96,6 @@ def me():
     user = User.get_by_id(current_user_id)
     response = {
             "id": user.id,
-            "name": user.name,
             "username": user.username,
             "email": user.email,
         }
@@ -112,7 +110,6 @@ def user(user_id):
     if user:
         response = {
             "id": user.id,
-            "name": user.name,
             "username": user.username,
             "email": user.email,
         }
