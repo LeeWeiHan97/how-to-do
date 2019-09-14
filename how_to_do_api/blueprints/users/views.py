@@ -211,6 +211,7 @@ def new_room():
             }
 
         return jsonify (response)
+        
     else:
         response = {
             "status": "failed",
@@ -325,6 +326,16 @@ def new_public_category():
     roomID = user.room_id
     public_category_create = PublicCategory(name=name, description=description, completed_by=completed_by, created_by_id=current_user_id, room_id= roomID)
     if public_category_create.save():
+        users_in_room = User.select().where(User.room_id == roomID)
+        registration_id = [user.android_token for user in users_in_room]
+        title = f"{user.username} has added {name} to the group!"
+        if len(description) != 0:
+            body = description
+        else:
+            body = ""
+
+        notification(registration_id, title, body)
+
         response = {
             "status": "success"
         }
@@ -393,10 +404,23 @@ def kick():
     if user.is_admin == True:
         user_to_remove = User.get_by_id(kick_id)
         user_to_remove.room_id = None
-        user_to_remove.save()
-        response = {
-            "status": "success"
-        }
+        registration_id = user_to_remove.android_token
+        title = f"You have been kicked from your household group!"
+        sad_messages = ["Sucks to be you!", "It really do be like that sometimes!", "Yikes!", "Oof, bummer!"]
+        body= random.choice(sad_messages)
+        notification(registration_id, title, body)
+        if user_to_remove.save():
+            response = {
+                "status": "success"
+            }
+        else:
+            response = {
+                "status": "failed",
+                "errors": ", ".join(user_to_remove.errors)
+            }
+
+        return jsonify (response)
+
     else:
         response = {
             "status": "failed",
@@ -415,11 +439,34 @@ def add():
     current_room_id = user.room_id
     if user.is_admin == True:
         user_to_add = User.get_by_id(add_id)
-        user_to_add.room_id = current_room_id
-        user_to_add.save()
-        response = {
-            "status": "success"
-        }
+        if user_to_add.room_id == None:
+            user_to_add.room_id = current_room_id
+            if user_to_add.save():
+                registration_id = user_to_add.android_token
+                title = f"{user.username} has added you to their household group!"
+                body="(ᗒᗨᗕ)"
+                notification(registration_id, title, body)
+
+                response = {
+                    "status": "success"
+                }
+            
+            else:
+                response = {
+                    "status": "failed",
+                    "errors": ", ".join(user_t0_add.errors)
+                }
+
+            return jsonify (response)
+        
+        else:
+            response = {
+                "status": "failed",
+                "error": "user already in another room, please ask the user to exit their room first"
+            }
+
+        return jsonify (response)
+
     else:
           response = {
             "status": "failed",
@@ -439,6 +486,12 @@ def new_scheduled():
     roomID = user.room_id
     new_scheduled = Scheduled(name=name, date_time=date_time, room_id=roomID)
     if new_scheduled.save():
+        users_in_room = User.select().where(User.room_id == roomID)
+        registration_id = [user.android_token for user in users_in_room]
+        title = f"{user.username} has has added a scheduled task to the timetable!"
+        body="Now everyone has an extra task to do!  (╬ಠ益ಠ)"
+        notification(registration_id, title, body)
+
         response = {
             "status": "success"
         }
