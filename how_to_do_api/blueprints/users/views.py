@@ -11,6 +11,7 @@ from models.task import Task
 from models.scheduled_task import Scheduled
 from pyfcm import FCMNotification
 import os
+import datetime
 
 
 users_api_blueprint = Blueprint('users_api',
@@ -65,13 +66,14 @@ def login():
     users = User.select()
     for user in users:
         if username == user.username and password == user.password:
-            jwt_token = create_access_token(identity=user.id)
+            expires = datetime.timedelta(days=365)
+            jwt_token = create_access_token(identity=user.id, expires_delta=expires)
             android_token = request.json.get('android_token')
             user.android_token = android_token
             if user.save():
                 response = {
                     "status": "success",
-                    "user_id": user.id,
+                    "user_id": str(user.id),
                     "jwt_token": jwt_token
                 }
             else:
@@ -95,19 +97,25 @@ def users():
     users = User.select()
     response = {
         "status": "success",
-        "users": [user.id for user in users]
+        "users": [str(user.id) for user in users]
     }
 
     return jsonify (response)
 
 
-@users_api_blueprint.route('/housemates', methods=['GET'])
-def housemates():
-    roomID = request.json.get('room_id')
+@users_api_blueprint.route('/housemates/<room_id>', methods=['GET'])
+def housemates(room_id):
+    roomID = room_id
     users = User.select().where(User.room_id == roomID)
     response = {
         "status": "success",
-        "users": [user.id for user in users],
+        "users": [
+            {
+            "id": str(user.id),
+            "name": user.username,
+            "is admin": user.is_admin
+        } for user in users
+        ],
     }
 
     return jsonify (response)
@@ -119,11 +127,84 @@ def me():
     current_user_id = get_jwt_identity()
     user = User.get_by_id(current_user_id)
     response = {
-            "id": user.id,
+            "id": str(user.id),
             "username": user.username,
             "email": user.email,
+            "room id": str(user.room_id)
         }
     
+    return jsonify (response)
+
+
+@users_api_blueprint.route('/get/private_task', methods=['GET'])
+@jwt_required
+def get_private_task():
+    current_user_id = get_jwt_identity()
+    private_tasks = PrivateTask.select().where(PrivateTask.user_id == current_user_id)
+    response = [
+        {
+        "id": str(private_task.id),
+        "created at": private_task.created_at,
+        "task": private_task.name,
+        "description": private_task.description,
+        "completed by": private_task.completed_by,
+        "is completed": private_task.is_completed
+        } for private_task in private_tasks
+    ]
+
+    return jsonify (response)
+
+
+@users_api_blueprint.route('/get/public_category/<room_id>', methods=['GET'])
+@jwt_required
+def get_public_category(room_id):
+    roomID = room_id
+    room = Room.get_or_none(Room.id == roomID)
+    public_categories = PublicCategory.select().where(PublicCategory.room_id == roomID)
+    if room:
+        response = [
+            {
+            "id": str(public_category.id),
+            "created at": public_category.created_at,
+            "category": public_category.name,
+            "description": public_category.description,
+            "completed by": public_category.completed_by,
+            "is completed": public_category.is_completed
+            } for public_category in public_categories
+        ]
+
+    else:
+        response = {
+            "status": "failed",
+            "error": "room does not exist!"
+        }
+
+    return jsonify (response)
+
+
+@users_api_blueprint.route('/get/public_task/<public_category_id>', methods=['GET'])
+@jwt_required
+def get_public_task(public_category_id):
+    public_categoryID = public_category_id
+    public_category = PublicCategory.get_or_none(PublicCategory.id == public_categoryID)
+    tasks = Task.select().where(Task.public_category_id == public_categoryID)
+    if public_category:
+        response = [
+            {
+                "id": str(task.id),
+                "created at": task.created_at,
+                "task": task.name,
+                "created by": str(task.created_by_id),
+                "is completed": task.is_completed
+            } for task in tasks
+        ]
+    
+    else:
+        response = {
+            "status": "failed",
+            "error": "public category does not exist"
+        }
+
     return jsonify (response)
 
 
@@ -133,7 +214,7 @@ def user(user_id):
 
     if user:
         response = {
-            "id": user.id,
+            "id": str(user.id),
             "username": user.username,
             "email": user.email,
         }
@@ -151,7 +232,7 @@ def user(user_id):
 def join():
     current_user_id = get_jwt_identity()
     user = User.get_by_id(current_user_id)
-    roomID = request.json.get('room_id')
+    roomID = int(request.json.get('room_id'))
     rooms = Room.select()
 
     if user.room_id != roomID:
@@ -167,8 +248,11 @@ def join():
                 user.save()
 
                 response = {
-                    "status": "success"
+                "status": "success",
+                "room_id": str(room.id),
+                "room_name": room.name
                 }
+                
                 return jsonify (response)
 
         response = {
@@ -201,7 +285,7 @@ def new_room():
         if user.save():
             response = {
                 "status": "success",
-                "room_id": room.id,
+                "room_id": str(room.id),
                 "room_name": room.name
             }
         else:
@@ -226,7 +310,7 @@ def new_room():
 def delete_room():
     current_user_id = get_jwt_identity()
     user = User.get_by_id(current_user_id)
-    roomId = request.json.get('room_id')
+    roomId = int(request.json.get('room_id'))
     room = Room.get_or_none(Room.id == roomId)
     if room and user.room.id == roomId:
         if user.is_admin == True:
@@ -277,7 +361,7 @@ def new_private_task():
 def delete_private_task():
     current_user_id = get_jwt_identity()
     user = User.get_by_id(current_user_id)
-    task_id = request.json.get('task_id')
+    task_id = int(request.json.get('task_id'))
     task = PrivateTask.get_by_id(task_id)
     if task.user_id == current_user_id:
         task_to_delete = PrivateTask.delete().where(PrivateTask.id == task_id).execute()
@@ -298,7 +382,7 @@ def delete_private_task():
 def complete_private_task():
     current_user_id = get_jwt_identity()
     user = User.get_by_id(current_user_id)
-    task_id = request.json.get('task_id')
+    task_id = int(request.json.get('task_id'))
     task = PrivateTask.get_by_id(task_id)
     if task.user_id == current_user_id:
         task.is_completed = True
@@ -372,7 +456,7 @@ def new_public_task():
 @users_api_blueprint.route('/completepublictask', methods=['POST'])
 @jwt_required
 def complete_public_task():
-    task_id = request.json.get('task_id')
+    task_id = int(request.json.get('task_id'))
     task = Task.get_by_id(task_id)
     task.is_completed = True
     task.save()
@@ -386,7 +470,7 @@ def complete_public_task():
 @users_api_blueprint.route('/completepubliccategory', methods=['POST'])
 @jwt_required
 def complete_public_category():
-    category_id = request.json.get('category_id')
+    category_id = int(request.json.get('category_id'))
     PublicCategory.update(is_completed = True).where(PublicCategory.id == category_id).execute()
     response = {
         "status": "success"
@@ -400,7 +484,7 @@ def complete_public_category():
 def kick():
     current_user_id = get_jwt_identity()
     user = User.get_by_id(current_user_id)
-    kick_id = request.json.get('kicked_id')
+    kick_id = int(request.json.get('kicked_id'))
     if user.is_admin == True:
         user_to_remove = User.get_by_id(kick_id)
         user_to_remove.room_id = None
@@ -435,7 +519,7 @@ def kick():
 def add():
     current_user_id = get_jwt_identity()
     user = User.get_by_id(current_user_id)
-    add_id = request.json.get('add_id')
+    add_id = int(request.json.get('add_id'))
     current_room_id = user.room_id
     if user.is_admin == True:
         user_to_add = User.get_by_id(add_id)
@@ -506,8 +590,7 @@ def new_scheduled():
 
 @users_api_blueprint.route('/notification', methods=['POST'])
 def notifications():
-    notification("cXCOU_0R6cs:APA91bG1bTMINOY91tqaaEvx13ha4OrymlRR7kX5fOcTLRZ2OEIGp8s6uS2URSmlBYRuCywrcoTcWnUt-veK3TLPqcpMyOlfU1BSpHaGvzq3sd-AQC1F1n3_B5EDgYxFiqZ8e0smfgA9", "test title", "test body")
-
+    notification("d1FLX1A4sf8:APA91bE9Q-ToRju01LxyMIclingnYZ9gyq-k2ynR4yuYEz9i30qBCuripV8cuhzSng1KeBGuytnVmxOco1V1LUwSZa0On66TlyQw-elrsrC2j_lweLmEB4CFnLWMsmNmd_hCKFQBkIKD", "test title", "test body")
     response = {
         "status": "success"
     }
