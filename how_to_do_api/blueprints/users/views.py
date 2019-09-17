@@ -100,7 +100,9 @@ def users():
     users = User.select()
     response = {
         "status": "success",
-        "users": [str(user.id) for user in users]
+        "users": [user.id for user in users],
+        "usernames": [user.username for user in users],
+        "emails": [user.email for user in users]
     }
 
     return jsonify (response)
@@ -227,6 +229,31 @@ def user(user_id):
             "error": "User not found"
         }
     
+    return jsonify (response)
+
+
+@users_api_blueprint.route('/edit', methods=['POST'])
+@jwt_required
+def edit():  
+    username = request.json.get('username')
+    email = request.json.get('email')
+    current_user_id = get_jwt_identity()
+    user = User.get_by_id(current_user_id)
+    user.username = username
+    user.email = email
+    if user.save():
+        response = {
+            "status": "success",
+            "new_username": username,
+            "new_email": email,
+        }
+    
+    else:
+        response = {
+            "status": "failed",
+            "errors": ", ".join(user.errors)
+        }
+
     return jsonify (response)
 
 
