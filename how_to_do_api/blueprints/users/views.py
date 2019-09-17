@@ -226,12 +226,12 @@ def get_public_task(public_category_id):
     return jsonify (response)
 
 
-@users_api_blueprint.route('get/scheduled/<roomID>/<time>/<day>', methods=['GET'])
+@users_api_blueprint.route('get/scheduled/<roomID>/<repeat_by>/<day>', methods=['GET'])
 @jwt_required
-def get_scheduled(roomID, time, day):
+def get_scheduled(roomID, repeat_by, day):
     room = Room.get_or_none(Room.id == roomID)
     if room:
-        tasks = Scheduled.select().where((Scheduled.time == time) & (Scheduled.repeat_on == day) &(Scheduled.room_id == room.id))
+        tasks = Scheduled.select().where((Scheduled.repeat_by == repeat_by) & (Scheduled.repeat_on == day) &(Scheduled.room_id == room.id))
         if len(tasks) == 0:
             response = {
                 "status": "failed",
