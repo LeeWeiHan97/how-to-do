@@ -11,7 +11,8 @@ from models.task import Task
 from models.scheduled_task import Scheduled
 from pyfcm import FCMNotification
 import os
-import datetime
+from datetime import datetime, timedelta
+import calendar
 
 
 users_api_blueprint = Blueprint('users_api',
@@ -30,6 +31,17 @@ def notification(registrationId, title, body):
         result = push_service.notify_multiple_devices(registration_ids=registration_id, message_title=message_title, message_body=message_body)
     else:
         raise Exception('registration id should be a string or a list of strings')
+
+
+def add_months(sourcedate, months):
+    month = sourcedate.month - 1 + months
+    year = sourcedate.year + month // 12
+    month = month % 12 + 1
+    hour = sourcedate.hour
+    minute = sourcedate.minute
+    second = sourcedate.second
+    day = min(sourcedate.day, calendar.monthrange(year,month)[1])
+    return datetime(year, month, day, hour, minute, second)
 
 
 @users_api_blueprint.route('/signup', methods=['POST'])
@@ -135,7 +147,8 @@ def me():
             "id": str(user.id),
             "username": user.username,
             "email": user.email,
-            "room id": str(user.room_id)
+            "room id": str(user.room_id),
+            "is_admin": user.is_admin
         }
     
     return jsonify (response)
@@ -208,6 +221,40 @@ def get_public_task(public_category_id):
         response = {
             "status": "failed",
             "error": "public category does not exist"
+        }
+
+    return jsonify (response)
+
+
+@users_api_blueprint.route('get/scheduled/<roomID>/<time>/<day>', methods=['GET'])
+@jwt_required
+def get_scheduled(roomID, time, day):
+    room = Room.get_or_none(Room.id == roomID)
+    if room:
+        tasks = Scheduled.select().where((Scheduled.time == time) & (Scheduled.repeat_on == day) &(Scheduled.room_id == room.id))
+        if len(tasks) == 0:
+            response = {
+                "status": "failed",
+                "error": "no such scheduled task at specified time and day!"
+            }
+        
+        else:
+            response = [
+                {
+                    "task_id": str(task.id),
+                    "task": task.name,
+                    "user_id_incharge": task.user_incharge_id,
+                    "is_completed": task.is_completed,
+                    "created_at": task.created_at
+                } for task in tasks
+            ]
+        
+        return jsonify (response)
+    
+    else:
+        response = {
+            "status": "failed",
+            "error": "room does not exist!"
         }
 
     return jsonify (response)
@@ -596,25 +643,38 @@ def new_scheduled():
     current_user_id = get_jwt_identity()
     user = User.get_by_id(current_user_id)
     name = request.json.get('task')
-    date_time = request.json['datetime']
+    date_time = datetime.strptime(request.json['date_time'], '%Y-%m-%d %H:%M:%S')
+    repeat_by = request.json.get('repeat_by')
+    repeat_on = request.json.get('repeat_on')
+    repeat_for = int(request.json.get('repeat_for'))
     roomID = user.room_id
-    new_scheduled = Scheduled(name=name, date_time=date_time, room_id=roomID)
-    if new_scheduled.save():
-        users_in_room = User.select().where(User.room_id == roomID)
-        registration_id = [user.android_token for user in users_in_room]
-        title = f"{user.username} has has added a scheduled task to the timetable!"
-        body="Now everyone has an extra task to do!  (╬ಠ益ಠ)"
-        notification(registration_id, title, body)
 
-        response = {
-            "status": "success"
-        }
-    else:
-        response = {
-            "status": "failed",
-            "errors": ', '.join(new_scheduled.errors)
-        }
-    
+    if repeat_by == "weekly":
+        data_source = []
+        i = 0
+        while i < repeat_for:
+            add_data = {"name": name, "date_time": date_time, "room_id": roomID, "repeat_by": repeat_by, "repeat_on": repeat_on}
+            data_source.append(add_data)
+            date_time += timedelta(days = 7)
+            i = i + 1
+        
+        Scheduled.insert_many(data_source).execute()
+
+    elif repeat_by == "monthly":
+        data_source = []
+        i = 0
+        while i < repeat_for:
+            add_data = {"name": name, "date_time": date_time, "room_id": roomID, "repeat_by": repeat_by, "repeat_on": repeat_on}
+            data_source.append(add_data)
+            date_time = add_months(date_time,1)
+            i = i + 1
+
+        Scheduled.insert_many(data_source).execute()
+
+    response = {
+        "status": "success"
+    }
+
     return jsonify (response)
 
 
