@@ -74,7 +74,10 @@ def login():
                 response = {
                     "status": "success",
                     "user_id": str(user.id),
-                    "jwt_token": jwt_token
+                    "jwt_token": jwt_token,
+                    "username": user.username,
+                    "email": user.email,
+                    "room id": str(user.room_id)
                 }
             else:
                 response = {
@@ -590,7 +593,7 @@ def new_scheduled():
 
 @users_api_blueprint.route('/notification', methods=['POST'])
 def notifications():
-    notification("d1FLX1A4sf8:APA91bE9Q-ToRju01LxyMIclingnYZ9gyq-k2ynR4yuYEz9i30qBCuripV8cuhzSng1KeBGuytnVmxOco1V1LUwSZa0On66TlyQw-elrsrC2j_lweLmEB4CFnLWMsmNmd_hCKFQBkIKD", "test title", "test body")
+    notification("cD0tlSBK1OQ:APA91bGDbKWOa8nlwjZcsf4ATA8e3iWBB7bda5HOGhU6pqlqgGGmb9-DA00gNNV8TzIRQrFbrnSATsqFN4xpQa2dzTTp5IqQ02BpitqJTbbHW6WESEpm45xJobDhJ_Girw0Z7a_PAo_8", "test title", "test body")
     response = {
         "status": "success"
     }
