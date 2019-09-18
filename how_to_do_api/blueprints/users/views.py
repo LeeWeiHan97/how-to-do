@@ -13,6 +13,7 @@ from pyfcm import FCMNotification
 import os
 from datetime import datetime, timedelta
 import calendar
+import json, requests
 
 
 users_api_blueprint = Blueprint('users_api',
@@ -622,7 +623,7 @@ def add():
             else:
                 response = {
                     "status": "failed",
-                    "errors": ", ".join(user_t0_add.errors)
+                    "errors": ", ".join(user_to_add.errors)
                 }
 
             return jsonify (response)
@@ -714,4 +715,22 @@ def notifications():
     return jsonify (response)
 
 
+@users_api_blueprint.route('/geolocation', methods=['POST'])
+def geolocation():
+    lattitude = request.json.get('lattitude')
+    longitude = request.json.get('longitude')
+    url = 'https://api.foursquare.com/v2/venues/search'
 
+    params = dict(
+    client_id=os.environ.get('FOURSQUARE_CLIENT_ID'),
+    client_secret=os.environ.get('FOURSQUARE_CLIENT_SECRET'),
+    v='20180323',
+    ll=f'{lattitude},{longitude}',
+    query='grocery',
+    limit=5,
+    radius=500
+    )
+    resp = requests.get(url=url, params=params)
+    data = json.loads(resp.text)
+
+    return jsonify (data)
