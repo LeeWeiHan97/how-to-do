@@ -6,12 +6,12 @@ import datetime
 
 class Scheduled(BaseModel):
     name = pw.CharField(unique=False, null=False) 
-    is_completed = pw.BooleanField(default=False)
     date_time = pw.DateTimeField(null=False, unique=False)
     user_incharge = pw.ForeignKeyField(User, backref="user_scheduled_tasks", null=True, on_delete="CASCADE")
     room = pw.ForeignKeyField(Room, backref="room_scheduled_tasks", null=False, on_delete="CASCADE")
     repeat_by = pw.CharField(unique=False, null=False)
     repeat_on = pw.CharField(unique=False, null=False)
+    remind_at = pw.DateTimeField(unique=False, null=True)
     
     def validate(self):
         if len(self.name) == 0:
@@ -28,3 +28,11 @@ class Scheduled(BaseModel):
             date_obj = datetime.datetime.strptime(datetime_string, datetime_format)
         except ValueError:
             self.errors.append('Wrong format for datetime input')
+
+        if self.remind_at != None:
+            datetime_string = self.remind_at
+
+            try:
+                date_obj = datetime.datetime.strptime(datetime_string, datetime_format)
+            except ValueError:
+                self.errors.append('Wrong format for remind_at input')

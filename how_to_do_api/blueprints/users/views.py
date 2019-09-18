@@ -56,6 +56,9 @@ def create():
         if user_create.save():
             response = {
                 "status": "success",
+                "user_id": str(user_create.id),
+                "username": user_create.username,
+                "email": user_create.email
             }
         else:
             response = {
@@ -78,7 +81,7 @@ def login():
     users = User.select()
     for user in users:
         if username == user.username and password == user.password:
-            expires = datetime.timedelta(days=365)
+            expires = timedelta(days=365)
             jwt_token = create_access_token(identity=user.id, expires_delta=expires)
             android_token = request.json.get('android_token')
             user.android_token = android_token
@@ -163,9 +166,7 @@ def get_private_task():
         {
         "id": str(private_task.id),
         "created at": private_task.created_at,
-        "task": private_task.name,
-        "description": private_task.description,
-        "completed by": private_task.completed_by,
+        "task": private_task.description,
         "is completed": private_task.is_completed
         } for private_task in private_tasks
     ]
@@ -244,8 +245,8 @@ def get_scheduled(roomID, repeat_by, day):
                     "task_id": str(task.id),
                     "task": task.name,
                     "user_id_incharge": task.user_incharge_id,
-                    "is_completed": task.is_completed,
-                    "created_at": task.created_at
+                    "created_at": task.created_at,
+                    "remind_at": task.remind_at
                 } for task in tasks
             ]
         
@@ -416,10 +417,8 @@ def delete_room():
 def new_private_task():
     current_user_id = get_jwt_identity()
     user = User.get_by_id(current_user_id)
-    name = request.json.get('name')
     description = request.json.get('description')
-    completed_by = request.json.get('completed_by')
-    private_task_create = PrivateTask(user_id=user.id, name=name, description=description, completed_by=completed_by)
+    private_task_create = PrivateTask(user_id=user.id, description=description)
     if private_task_create.save():
         response = {
             "status": "success"
@@ -498,8 +497,12 @@ def new_public_category():
         notification(registration_id, title, body)
 
         response = {
-            "status": "success"
+            "status": "success",
+            "created_by_id": public_category_create.created_by_id,
+            "room_id": public_category_create.room_id,
+            "category": public_category_create.name
         }
+        
     else:
         response = {
             "status": "failed",
@@ -603,13 +606,15 @@ def add():
         if user_to_add.room_id == None:
             user_to_add.room_id = current_room_id
             if user_to_add.save():
+                users_in_room = User.select().where(User.room_id == current_room_id)
                 registration_id = user_to_add.android_token
                 title = f"{user.username} has added you to their household group!"
                 body="(ᗒᗨᗕ)"
                 notification(registration_id, title, body)
 
                 response = {
-                    "status": "success"
+                    "status": "success",
+                    "users in room": users_in_room
                 }
             
             else:
@@ -647,33 +652,52 @@ def new_scheduled():
     repeat_by = request.json.get('repeat_by')
     repeat_on = request.json.get('repeat_on')
     repeat_for = int(request.json.get('repeat_for'))
+    remind_at = request.json.get('remind_at')
     roomID = user.room_id
 
     if repeat_by == "weekly":
         data_source = []
         i = 0
         while i < repeat_for:
-            add_data = {"name": name, "date_time": date_time, "room_id": roomID, "repeat_by": repeat_by, "repeat_on": repeat_on}
+            add_data = {"name": name, "date_time": date_time, "room_id": roomID, "repeat_by": repeat_by, "repeat_on": repeat_on, "remind_at": remind_at}
             data_source.append(add_data)
             date_time += timedelta(days = 7)
             i = i + 1
         
         Scheduled.insert_many(data_source).execute()
 
+        tasks = Scheduled.select().where((Scheduled.repeat_by == repeat_by) & (Scheduled.repeat_on == repeat_on) &(Scheduled.room_id == roomID))
+
     elif repeat_by == "monthly":
         data_source = []
         i = 0
         while i < repeat_for:
-            add_data = {"name": name, "date_time": date_time, "room_id": roomID, "repeat_by": repeat_by, "repeat_on": repeat_on}
+            add_data = {"name": name, "date_time": date_time, "room_id": roomID, "repeat_by": repeat_by, "repeat_on": repeat_on, "remind_at": remind_at}
             data_source.append(add_data)
             date_time = add_months(date_time,1)
             i = i + 1
 
         Scheduled.insert_many(data_source).execute()
 
-    response = {
-        "status": "success"
-    }
+        tasks = Scheduled.select().where((Scheduled.repeat_by == repeat_by) & (Scheduled.repeat_on == repeat_on) &(Scheduled.room_id == roomID))
+
+    else:
+        response = {
+            "status": "failed",
+            "error": "repeat_by can only be 'weekly' or 'monthly', please check spelling!"
+        }
+
+        return jsonify (response)
+    
+    response = [
+        {
+            "task_id": str(task.id),
+            "task": task.name,
+            "user_id_incharge": task.user_incharge_id,
+            "created_at": task.created_at,
+            "remind_at": task.remind_at
+        } for task in tasks
+    ]
 
     return jsonify (response)
 
