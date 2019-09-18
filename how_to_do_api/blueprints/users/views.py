@@ -246,7 +246,9 @@ def get_scheduled(roomID, repeat_by, day):
                     "task": task.name,
                     "user_id_incharge": task.user_incharge_id,
                     "created_at": task.created_at,
-                    "remind_at": task.remind_at
+                    "date_time": task.date_time,
+                    "repeat_by": task.repeat_by,
+                    "repeat_on": task.repeat_on
                 } for task in tasks
             ]
         
@@ -652,14 +654,13 @@ def new_scheduled():
     repeat_by = request.json.get('repeat_by')
     repeat_on = request.json.get('repeat_on')
     repeat_for = int(request.json.get('repeat_for'))
-    remind_at = request.json.get('remind_at')
     roomID = user.room_id
 
     if repeat_by == "weekly":
         data_source = []
         i = 0
         while i < repeat_for:
-            add_data = {"name": name, "date_time": date_time, "room_id": roomID, "repeat_by": repeat_by, "repeat_on": repeat_on, "remind_at": remind_at}
+            add_data = {"name": name, "date_time": date_time, "room_id": roomID, "repeat_by": repeat_by, "repeat_on": repeat_on}
             data_source.append(add_data)
             date_time += timedelta(days = 7)
             i = i + 1
@@ -672,7 +673,7 @@ def new_scheduled():
         data_source = []
         i = 0
         while i < repeat_for:
-            add_data = {"name": name, "date_time": date_time, "room_id": roomID, "repeat_by": repeat_by, "repeat_on": repeat_on, "remind_at": remind_at}
+            add_data = {"name": name, "date_time": date_time, "room_id": roomID, "repeat_by": repeat_by, "repeat_on": repeat_on}
             data_source.append(add_data)
             date_time = add_months(date_time,1)
             i = i + 1
@@ -695,7 +696,8 @@ def new_scheduled():
             "task": task.name,
             "user_id_incharge": task.user_incharge_id,
             "created_at": task.created_at,
-            "remind_at": task.remind_at
+            "date_time": task.date_time,
+            "repeat_by": task.repeat_by
         } for task in tasks
     ]
 
