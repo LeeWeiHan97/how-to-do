@@ -717,7 +717,7 @@ def notifications():
 
 @users_api_blueprint.route('/geolocation', methods=['POST'])
 def geolocation():
-    lattitude = request.json.get('lattitude')
+    latitude = request.json.get('latitude')
     longitude = request.json.get('longitude')
     url = 'https://api.foursquare.com/v2/venues/search'
 
@@ -725,7 +725,7 @@ def geolocation():
     client_id=os.environ.get('FOURSQUARE_CLIENT_ID'),
     client_secret=os.environ.get('FOURSQUARE_CLIENT_SECRET'),
     v='20180323',
-    ll=f'{lattitude},{longitude}',
+    ll=f'{latitude},{longitude}',
     query='grocery',
     limit=5,
     radius=500
