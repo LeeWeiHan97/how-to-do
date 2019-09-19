@@ -617,6 +617,26 @@ def complete_public_category():
     return jsonify (response)
 
 
+@users_api_blueprint.route('/deletepubliccategory', methods=['POST'])
+@jwt_required
+def delete_public_category():
+    category_id = int(request.json.get('category_id'))
+    category = PublicCategory.get_or_none(PublicCategory.id == category_id)
+    if category:
+        category_to_delete = PublicCategory.delete().where(PublicCategory.id == category_id).execute()
+        response = {
+        "status": "successfully deleted"
+        }
+        
+    else:
+        response = {
+            "status": "failed",
+            "error": "Public category not found"
+        }
+
+    return jsonify (response)
+
+
 @users_api_blueprint.route('/kick', methods=['POST'])
 @jwt_required
 def kick():
