@@ -504,8 +504,14 @@ def complete_private_task():
     task_id = int(request.json.get('task_id'))
     task = PrivateTask.get_by_id(task_id)
     if task.user_id == current_user_id:
-        task.is_completed = True
-        task.save()
+        if task.is_completed == False:
+            task.is_completed = True
+            task.save()
+            
+        else:
+            task.is_completed = False
+            task.save()
+
         response = {
             "status": "success"
         }
