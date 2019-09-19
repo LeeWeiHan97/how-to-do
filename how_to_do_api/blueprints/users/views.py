@@ -248,8 +248,8 @@ def get_all_scheduled():
                     "task": task.name,
                     "user_id_incharge": task.user_incharge_id,
                     "created_at": task.created_at,
-                    "date": f'{task.date_time.year}-{task.date_time.month}-{task.date_time.day}',
-                    "time": f'{task.date_time.hour}:{task.date_time.minute}:{task.date_time.second}',
+                    "date": task.date_time.strftime('%Y-%m-%d'),
+                    "time": task.date_time.strftime('%H:%M:%S'),
                     "repeat_by": task.repeat_by,
                     "repeat_on": task.repeat_on
                 } for task in tasks
@@ -284,8 +284,8 @@ def get_scheduled(roomID, repeat_by, day):
                     "task": task.name,
                     "user_id_incharge": task.user_incharge_id,
                     "created_at": task.created_at,
-                    "date": f'{task.date_time.year}-{task.date_time.month}-{task.date_time.day}',
-                    "time": f'{task.date_time.hour}:{task.date_time.minute}:{task.date_time.second}',
+                    "date": task.date_time.strftime('%Y-%m-%d'),
+                    "time": task.date_time.strftime('%H:%M:%S'),
                     "repeat_by": task.repeat_by,
                     "repeat_on": task.repeat_on
                 } for task in tasks
@@ -433,6 +433,8 @@ def delete_room():
     room = Room.get_or_none(Room.id == roomId)
     if room and user.room.id == roomId:
         if user.is_admin == True:
+            user.is_admin = False
+            user.save()
             room_to_delete = Room.delete().where(Room.id == roomId).execute()
             response = {
                 "status": "success"
@@ -609,7 +611,12 @@ def delete_public_task():
 @jwt_required
 def complete_public_category():
     category_id = int(request.json.get('category_id'))
-    PublicCategory.update(is_completed = True).where(PublicCategory.id == category_id).execute()
+    category = PublicCategory.get_by_id(category_id)
+    if category.is_completed == False:
+        PublicCategory.update(is_completed = True).where(PublicCategory.id == category_id).execute()
+    else:
+        PublicCategory.update(is_completed = False).where(PublicCategory.id == category_id).execute()
+
     response = {
         "status": "success"
     }
@@ -627,7 +634,7 @@ def delete_public_category():
         response = {
         "status": "successfully deleted"
         }
-        
+
     else:
         response = {
             "status": "failed",
@@ -731,7 +738,6 @@ def new_scheduled():
     repeat_on = request.json.get('repeat_on')
     repeat_for = int(request.json.get('repeat_for'))
     roomID = user.room_id
-    breakpoint()
 
     if repeat_by == "weekly":
         data_source = []
@@ -773,12 +779,12 @@ def new_scheduled():
             "task": task.name,
             "user_id_incharge": task.user_incharge_id,
             "created_at": task.created_at,
-            "date": f'{task.date_time.year}-{task.date_time.month}-{task.date_time.day}',
-            "time": f'{task.date_time.hour}:{task.date_time.minute}:{task.date_time.second}',
+            "date": task.date_time.strftime('%Y-%m-%d'),
+            "time": task.date_time.strftime('%H:%M:%S'),
             "repeat_by": task.repeat_by
         } for task in tasks
     ]
-
+    breakpoint()
     return jsonify (response)
 
 
