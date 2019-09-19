@@ -5,15 +5,14 @@ import datetime
 from models.room import Room
 
 class PublicCategory(BaseModel):
-    name = pw.CharField(unique=False, null=False)
-    description = pw.CharField(unique=False, null=True)
+    task = pw.CharField(unique=False, null=False)
     completed_by = pw.DateTimeField(null=False, unique=False)
     is_completed = pw.BooleanField(default=False)
     created_by = pw.ForeignKeyField(User, backref="user_created_public_tasks", null=False, on_delete="CASCADE")
     room = pw.ForeignKeyField(Room, backref="room_public_tasks", null=False, on_delete="CASCADE")
 
     def validate(self):
-        if len(self.name) == 0:
+        if len(self.task) == 0:
             self.errors.append('Task is empty')
 
         datetime_string = self.completed_by

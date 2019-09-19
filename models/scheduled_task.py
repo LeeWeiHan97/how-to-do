@@ -24,6 +24,8 @@ class Scheduled(BaseModel):
         datetime_format = '%Y-%m-%d %H:%M:%S'
 
         try:
-            date_obj = datetime.datetime.strptime(datetime_string, datetime_format)
+            date_obj = datetime.strptime(datetime_string, datetime_format)
         except ValueError:
             self.errors.append('Wrong format for datetime input')
+
+

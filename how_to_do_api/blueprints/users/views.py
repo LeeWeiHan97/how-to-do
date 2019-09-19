@@ -11,7 +11,7 @@ from models.task import Task
 from models.scheduled_task import Scheduled
 from pyfcm import FCMNotification
 import os
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date, time
 import calendar
 import json, requests
 
@@ -186,8 +186,7 @@ def get_public_category(room_id):
             {
             "id": str(public_category.id),
             "created at": public_category.created_at,
-            "category": public_category.name,
-            "description": public_category.description,
+            "category": public_category.task,
             "completed by": public_category.completed_by,
             "is completed": public_category.is_completed
             } for public_category in public_categories
@@ -228,6 +227,44 @@ def get_public_task(public_category_id):
     return jsonify (response)
 
 
+@users_api_blueprint.route('get/scheduled', methods=['GET'])
+@jwt_required
+def get_all_scheduled():
+    current_user_id = get_jwt_identity()
+    user = User.get_by_id(current_user_id)
+    room = Room.get_or_none(Room.id == user.room_id)
+    if room:
+        tasks = Scheduled.select().where(Scheduled.room_id == room.id)
+        if len(tasks) == 0:
+            response = {
+                "status": "failed",
+                "error": "no such scheduled task at specified time and day!"
+            }
+        
+        else:
+            response = [
+                {
+                    "task_id": str(task.id),
+                    "task": task.name,
+                    "user_id_incharge": task.user_incharge_id,
+                    "created_at": task.created_at,
+                    "date": f'{task.date_time.year}-{task.date_time.month}-{task.date_time.day}',
+                    "time": f'{task.date_time.hour}:{task.date_time.minute}:{task.date_time.second}',
+                    "repeat_by": task.repeat_by,
+                    "repeat_on": task.repeat_on
+                } for task in tasks
+            ]
+        
+        return jsonify (response)
+    
+    else:
+        response = {
+            "status": "failed",
+            "error": "room does not exist!"
+        }
+
+
+
 @users_api_blueprint.route('get/scheduled/<roomID>/<repeat_by>/<day>', methods=['GET'])
 @jwt_required
 def get_scheduled(roomID, repeat_by, day):
@@ -247,7 +284,8 @@ def get_scheduled(roomID, repeat_by, day):
                     "task": task.name,
                     "user_id_incharge": task.user_incharge_id,
                     "created_at": task.created_at,
-                    "date_time": task.date_time,
+                    "date": f'{task.date_time.year}-{task.date_time.month}-{task.date_time.day}',
+                    "time": f'{task.date_time.hour}:{task.date_time.minute}:{task.date_time.second}',
                     "repeat_by": task.repeat_by,
                     "repeat_on": task.repeat_on
                 } for task in tasks
@@ -484,18 +522,14 @@ def new_public_category():
     current_user_id = get_jwt_identity()
     user = User.get_by_id(current_user_id)
     name = request.json.get('category')
-    description = request.json.get('description')
     completed_by = request.json.get('completed_by')
     roomID = user.room_id
-    public_category_create = PublicCategory(name=name, description=description, completed_by=completed_by, created_by_id=current_user_id, room_id= roomID)
+    public_category_create = PublicCategory(task=name, completed_by=completed_by, created_by_id=current_user_id, room_id= roomID)
     if public_category_create.save():
         users_in_room = User.select().where(User.room_id == roomID)
         registration_id = [user.android_token for user in users_in_room]
         title = f"{user.username} has added {name} to the group!"
-        if len(description) != 0:
-            body = description
-        else:
-            body = ""
+        body = ""
 
         notification(registration_id, title, body)
 
@@ -503,7 +537,7 @@ def new_public_category():
             "status": "success",
             "created_by_id": public_category_create.created_by_id,
             "room_id": public_category_create.room_id,
-            "category": public_category_create.name
+            "category": public_category_create.task
         }
         
     else:
@@ -541,12 +575,33 @@ def new_public_task():
 def complete_public_task():
     task_id = int(request.json.get('task_id'))
     task = Task.get_by_id(task_id)
-    task.is_completed = True
+    if task.is_completed == True:
+        task.is_completed = False
+        task.save()
+    else:
+        task.is_completed = True
+        task.save()
+
     task.save()
     response = {
         "status": "success"
     }
 
+    return jsonify (response)
+
+
+@users_api_blueprint.route('/deletepublictask', methods=['POST'])
+@jwt_required
+def delete_public_task():
+    current_user_id = get_jwt_identity()
+    user = User.get_by_id(current_user_id)
+    task_id = int(request.json.get('task_id'))
+    task = Task.get_by_id(task_id)
+    task_to_delete = Task.delete().where(Task.id == task_id).execute()
+    response = {
+        "status": "successfully deleted"
+    }
+    
     return jsonify (response)
 
 
@@ -656,6 +711,7 @@ def new_scheduled():
     repeat_on = request.json.get('repeat_on')
     repeat_for = int(request.json.get('repeat_for'))
     roomID = user.room_id
+    breakpoint()
 
     if repeat_by == "weekly":
         data_source = []
@@ -697,7 +753,8 @@ def new_scheduled():
             "task": task.name,
             "user_id_incharge": task.user_incharge_id,
             "created_at": task.created_at,
-            "date_time": task.date_time,
+            "date": f'{task.date_time.year}-{task.date_time.month}-{task.date_time.day}',
+            "time": f'{task.date_time.hour}:{task.date_time.minute}:{task.date_time.second}',
             "repeat_by": task.repeat_by
         } for task in tasks
     ]
