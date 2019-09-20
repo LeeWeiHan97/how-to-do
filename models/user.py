@@ -10,7 +10,7 @@ class User(BaseModel):
     email = pw.CharField(unique=True, null=False)
     is_admin = pw.BooleanField(default=False)
     room = pw.ForeignKeyField(Room, backref='room_users', null=True, on_delete="SET NULL")
-    android_token = pw.CharField(unique=False, null=False)
+    android_token = pw.CharField(unique=False, null=True)
 
     def validate(self):
         user = User.get_or_none(User.username == self.username)

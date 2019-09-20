@@ -11,7 +11,7 @@ class Scheduled(BaseModel):
     room = pw.ForeignKeyField(Room, backref="room_scheduled_tasks", null=False, on_delete="CASCADE")
     repeat_by = pw.CharField(unique=False, null=False)
     repeat_on = pw.CharField(unique=False, null=False)
-    
+
     def validate(self):
         if len(self.name) == 0:
             self.errors.append('Task is empty')
