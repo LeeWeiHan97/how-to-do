@@ -228,20 +228,19 @@ def get_public_task(public_category_id):
     return jsonify (response)
 
 
-@users_api_blueprint.route('get/scheduled', methods=['GET'])
+@users_api_blueprint.route('get/scheduled/all', methods=['GET'])
 @jwt_required
 def get_all_scheduled():
     current_user_id = get_jwt_identity()
     user = User.get_by_id(current_user_id)
     room = Room.get_or_none(Room.id == user.room_id)
     if room:
-        tasks = Scheduled.select().where(Scheduled.room_id == room.id)
+        tasks = Scheduled.select().where(Scheduled.room_id == room.id).prefetch(Room)
         if len(tasks) == 0:
             response = {
                 "status": "failed",
                 "error": "no such scheduled task at specified time and day!"
             }
-        
         else:
             response = [
                 {
@@ -255,16 +254,14 @@ def get_all_scheduled():
                     "repeat_on": task.repeat_on
                 } for task in tasks
             ]
-        
+
         return jsonify (response)
-    
+
     else:
         response = {
             "status": "failed",
             "error": "room does not exist!"
         }
-
-
 
 @users_api_blueprint.route('get/scheduled/<roomID>/<repeat_by>/<day>', methods=['GET'])
 @jwt_required
@@ -754,7 +751,7 @@ def new_scheduled():
             data_source.append(add_data)
             date_time += timedelta(days = 7)
             i = i + 1
-        
+
         Scheduled.insert_many(data_source).execute()
 
         tasks = Scheduled.select().where((Scheduled.repeat_by == repeat_by) & (Scheduled.repeat_on == repeat_on) &(Scheduled.room_id == roomID))
@@ -791,6 +788,26 @@ def new_scheduled():
             "repeat_by": task.repeat_by
         } for task in tasks
     ]
+    return jsonify (response)
+
+@users_api_blueprint.route('/deletescheduledtask', methods=['POST'])
+@jwt_required
+def delete_scheduled_task():
+    current_user_id = get_jwt_identity()
+    user = User.get_by_id(current_user_id)
+    task_id = int(request.json.get('task_id'))
+    task = Scheduled.get_by_id(task_id)
+    if task.room_id == user.room_id:
+        task_to_delete = Scheduled.delete().where(Scheduled.id == task_id).execute()
+        response = {
+            "status": "successfully deleted"
+        }
+    else:
+        response = {
+            "status": "failed",
+            "error": "Do not try to delete other's personnal tasks!"
+        }
+
     return jsonify (response)
 
 
