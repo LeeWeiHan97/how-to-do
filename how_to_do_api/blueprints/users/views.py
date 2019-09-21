@@ -188,7 +188,8 @@ def get_public_category(room_id):
             "created at": public_category.created_at,
             "category": public_category.task,
             "completed by": public_category.completed_by,
-            "is completed": public_category.is_completed
+            "is completed": public_category.is_completed,
+            "created by": str(public_category.created_by_id)
             } for public_category in public_categories
         ]
 
@@ -507,7 +508,7 @@ def complete_private_task():
         if task.is_completed == False:
             task.is_completed = True
             task.save()
-            
+
         else:
             task.is_completed = False
             task.save()
@@ -790,7 +791,6 @@ def new_scheduled():
             "repeat_by": task.repeat_by
         } for task in tasks
     ]
-    breakpoint()
     return jsonify (response)
 
 
@@ -805,21 +805,76 @@ def notifications():
 
 
 @users_api_blueprint.route('/geolocation', methods=['POST'])
+@jwt_required
 def geolocation():
     latitude = request.json.get('latitude')
     longitude = request.json.get('longitude')
-    url = 'https://api.foursquare.com/v2/venues/search'
+    current_user_id = get_jwt_identity()
+    user = User.get_by_id(current_user_id)
+    public_categories = PublicCategory.select()
+    
+    for category in public_categories:
+        if category.task == "Grocery":
+            url = 'https://api.foursquare.com/v2/venues/search'
 
-    params = dict(
-    client_id=os.environ.get('FOURSQUARE_CLIENT_ID'),
-    client_secret=os.environ.get('FOURSQUARE_CLIENT_SECRET'),
-    v='20180323',
-    ll=f'{latitude},{longitude}',
-    query='grocery',
-    limit=5,
-    radius=500
-    )
-    resp = requests.get(url=url, params=params)
-    data = json.loads(resp.text)
+            params = dict(
+            client_id=os.environ.get('FOURSQUARE_CLIENT_ID'),
+            client_secret=os.environ.get('FOURSQUARE_CLIENT_SECRET'),
+            v='20180323',
+            ll=f'{latitude},{longitude}',
+            query='grocery',
+            limit=5,
+            radius=200
+            )
+            resp = requests.get(url=url, params=params)
+            data = json.loads(resp.text)
 
-    return jsonify (data)
+            if len(data) > 0:
+                registration_id = user.android_token
+                title = f"There's a grocery shop nearby! Do your work!"
+                body="(ᗒᗨᗕ)"
+                notification(registration_id, title, body)
+
+            return jsonify (data)
+            # change the data returned accordingly using postman!
+        
+    response = {
+        "status": "no public category with task grocery found"
+    }
+
+    return jsonify (response)
+
+
+@users_api_blueprint.route('/assign', methods=['POST'])
+@jwt_required
+def assign():
+    user_incharge_id = int(request.json.get('user_incharge_id'))
+    task_id = int(request.json.get('task_id'))
+    task = Scheduled.get_or_none(Scheduled.id == task_id)
+
+    if task:
+        task.user_incharge_id = user_incharge_id
+        if task.save():
+            response = {
+                "status": "success",
+                "task_id": str(task.id),
+                "updated_at": task.updated_at,
+                "user_incharge_id": str(task.user_incharge_id)
+            }
+
+        else:
+            response = {
+                "status": "failed",
+                "errors": ", ".join(task.errors)
+            }
+
+        return jsonify (response)
+    
+    else:
+        response = {
+            "status": "failed",
+            "error": "task with task_id given not found"
+        }
+
+    return jsonify (response)
+

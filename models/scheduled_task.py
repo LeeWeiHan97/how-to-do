@@ -20,12 +20,12 @@ class Scheduled(BaseModel):
         if len(self.repeat_on) == 0:
             self.errors.append('Repeat on is empty')
 
-        datetime_string = self.date_time
-        datetime_format = '%Y-%m-%d %H:%M:%S'
+        # datetime_string = self.date_time
+        # datetime_format = '%Y-%m-%d %H:%M:%S'
 
-        try:
-            date_obj = datetime.strptime(datetime_string, datetime_format)
-        except ValueError:
-            self.errors.append('Wrong format for datetime input')
+        # try:
+        #     date_obj = datetime.strptime(datetime_string, datetime_format)
+        # except ValueError:
+        #     self.errors.append('Wrong format for datetime input')
 
 
