@@ -22,16 +22,16 @@ users_api_blueprint = Blueprint('users_api',
 
 push_service = FCMNotification(api_key=os.environ.get("FCM_API_KEY"))
 
-def notification(registrationId, title, body):
-    registration_id = registrationId
-    message_title = title
-    message_body = body
-    if type(registrationId) == str:
-        result = push_service.notify_single_device(registration_id=registration_id, message_title=message_title, message_body=message_body)
-    elif type(registrationId) == list:
-        result = push_service.notify_multiple_devices(registration_ids=registration_id, message_title=message_title, message_body=message_body)
-    else:
-        raise Exception('registration id should be a string or a list of strings')
+    def notification(registrationId, title, body):
+        registration_id = registrationId
+        message_title = title
+        message_body = body
+        if type(registrationId) == str:
+            result = push_service.notify_single_device(registration_id=registration_id, message_title=message_title, message_body=message_body)
+        elif type(registrationId) == list:
+            result = push_service.notify_multiple_devices(registration_ids=registration_id, message_title=message_title, message_body=message_body)
+        else:
+            raise Exception('registration id should be a string or a list of strings')
 
 
 def add_months(sourcedate, months):
@@ -249,7 +249,7 @@ def get_all_scheduled():
                     "user_id_incharge": task.user_incharge_id,
                     "created_at": task.created_at,
                     "date": task.date_time.strftime('%Y-%m-%d'),
-                    "time": task.date_time.strftime('%H:%M:%S'),
+                    "time": f'{task.date_time.hour}:{task.date_time.minute}:{task.date_time.second}',
                     "repeat_by": task.repeat_by,
                     "repeat_on": task.repeat_on
                 } for task in tasks
@@ -282,8 +282,8 @@ def get_scheduled(roomID, repeat_by, day):
                     "task": task.name,
                     "user_id_incharge": task.user_incharge_id,
                     "created_at": task.created_at,
-                    "date": task.date_time.strftime('%Y-%m-%d'),
-                    "time": task.date_time.strftime('%H:%M:%S'),
+                    "date": f'{task.date_time.year}-{task.date_time.month}-{task.date_time.day}',
+                    "time": f'{task.date_time.hour}:{task.date_time.minute}:{task.date_time.second}',
                     "repeat_by": task.repeat_by,
                     "repeat_on": task.repeat_on
                 } for task in tasks
@@ -431,8 +431,6 @@ def delete_room():
     room = Room.get_or_none(Room.id == roomId)
     if room and user.room.id == roomId:
         if user.is_admin == True:
-            user.is_admin = False
-            user.save()
             room_to_delete = Room.delete().where(Room.id == roomId).execute()
             response = {
                 "status": "success"
@@ -615,35 +613,10 @@ def delete_public_task():
 @jwt_required
 def complete_public_category():
     category_id = int(request.json.get('category_id'))
-    category = PublicCategory.get_by_id(category_id)
-    if category.is_completed == False:
-        PublicCategory.update(is_completed = True).where(PublicCategory.id == category_id).execute()
-    else:
-        PublicCategory.update(is_completed = False).where(PublicCategory.id == category_id).execute()
-
+    PublicCategory.update(is_completed = True).where(PublicCategory.id == category_id).execute()
     response = {
         "status": "success"
     }
-
-    return jsonify (response)
-
-
-@users_api_blueprint.route('/deletepubliccategory', methods=['POST'])
-@jwt_required
-def delete_public_category():
-    category_id = int(request.json.get('category_id'))
-    category = PublicCategory.get_or_none(PublicCategory.id == category_id)
-    if category:
-        category_to_delete = PublicCategory.delete().where(PublicCategory.id == category_id).execute()
-        response = {
-        "status": "successfully deleted"
-        }
-
-    else:
-        response = {
-            "status": "failed",
-            "error": "Public category not found"
-        }
 
     return jsonify (response)
 
@@ -743,6 +716,7 @@ def new_scheduled():
     repeat_for = int(request.json.get('repeat_for'))
     roomID = user.room_id
 
+
     if repeat_by == "weekly":
         data_source = []
         i = 0
@@ -783,8 +757,8 @@ def new_scheduled():
             "task": task.name,
             "user_id_incharge": task.user_incharge_id,
             "created_at": task.created_at,
-            "date": task.date_time.strftime('%Y-%m-%d'),
-            "time": task.date_time.strftime('%H:%M:%S'),
+            "date": f'{task.date_time.year}-{task.date_time.month}-{task.date_time.day}',
+            "time": f'{task.date_time.hour}:{task.date_time.minute}:{task.date_time.second}',
             "repeat_by": task.repeat_by
         } for task in tasks
     ]
@@ -865,8 +839,12 @@ def geolocation():
 @users_api_blueprint.route('/assign', methods=['POST'])
 @jwt_required
 def assign():
-    user_incharge_id = int(request.json.get('user_incharge_id'))
+    user_incharge_username = request.json.get('user_incharge_username')
+    user_incharge = User.get_or_none(User.username==user_incharge_username)
+    user_incharge_id = user_incharge.id
+    # user_incharge_id = int(request.json.get('user_incharge_id'))
     task_id = int(request.json.get('task_id'))
+    
     task = Scheduled.get_or_none(Scheduled.id == task_id)
 
     if task:
@@ -886,7 +864,6 @@ def assign():
             }
 
         return jsonify (response)
-    
     else:
         response = {
             "status": "failed",
@@ -895,3 +872,65 @@ def assign():
 
     return jsonify (response)
 
+@users_api_blueprint.route('/assignroundrobin', methods=['POST'])
+@jwt_required
+def assignroundrobin():
+    current_user_id = get_jwt_identity()
+    user = User.get_by_id(current_user_id)
+    users = User.select().where(User.room_id == user.room_id)
+    task_id = int(request.json.get('task_id'))
+    task = Scheduled.get_or_none(Scheduled.id == task_id)
+    selected_date = datetime.strptime(request.json['selected_date'], '%Y-%m-%d %H:%M:%S')
+    tasks = Scheduled.select().where((Scheduled.created_at==task.created_at)&(Scheduled.date_time>=selected_date))
+
+    task_id_list = [task.id for task in tasks]
+    user_id_list = [user.id for user in users]
+    assign_id_list = []
+
+    while len(assign_id_list)<len(task_id_list):
+        for user_id in user_id_list:
+            assign_id_list.append(user_id)
+            if len(assign_id_list)==len(task_id_list):
+                break
+    # print(assign_id_list)
+    response = []
+
+    if task:
+        for count,task in enumerate(tasks):
+            task.user_incharge_id = assign_id_list[count]
+            if task.save():
+                response.append({"status": "success",
+                "task_id": str(task.id),
+                "updated_at": task.updated_at,
+                "date_time": task.date_time,
+                "user_incharge_id": str(task.user_incharge_id)})
+            else:
+                response = {
+                    "status": "failed",
+                    "errors": ", ".join(task.errors)
+                }
+        # if task.save():
+        #     response = [{
+        #         "status": "success",
+        #         "task_id": str(task.id),
+        #         "updated_at": task.updated_at,
+        #         "date_time": task.date_time,
+        #         "user_incharge_id": str(task.user_incharge_id)
+        #     } for task in tasks
+        #     ]
+
+        # else:
+        #     response = {
+        #         "status": "failed",
+        #         "errors": ", ".join(task.errors)
+        #     }
+
+        return jsonify (response)
+
+    else:
+        response = {
+            "status": "failed",
+            "error": "task with task_id given not found"
+        }
+
+    return jsonify (response)

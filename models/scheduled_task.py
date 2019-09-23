@@ -5,7 +5,7 @@ from models.room import Room
 import datetime
 
 class Scheduled(BaseModel):
-    name = pw.CharField(unique=False, null=False) 
+    name = pw.CharField(unique=False, null=False)
     date_time = pw.DateTimeField(null=False, unique=False)
     user_incharge = pw.ForeignKeyField(User, backref="user_scheduled_tasks", null=True, on_delete="CASCADE")
     room = pw.ForeignKeyField(Room, backref="room_scheduled_tasks", null=False, on_delete="CASCADE")
