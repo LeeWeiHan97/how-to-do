@@ -26,14 +26,14 @@ def return_db():
 
     else:
         from playhouse.pool import PooledPostgresqlExtDatabase
-
+        print(os)
         return PooledPostgresqlExtDatabase(
             db_config['database'],
             max_connections=os.getenv('DB_POOL', 5),
             stale_timeout=os.getenv('DB_TIMEOUT', 300),  # 5 minutes.
+            port=db_config.get('port', '5432'),
             user=db_config.get('user', None),
             password=db_config.get('password', None),
-            host=db_config.get('host', 'localhost'),
-            port=db_config.get('port', '5432'))
+            host=db_config.get('host', 'localhost'))
 
 db = return_db()
