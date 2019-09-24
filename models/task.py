@@ -8,7 +8,7 @@ class Task(BaseModel):
     is_completed = pw.BooleanField(default=False)
     public_category = pw.ForeignKeyField(PublicCategory, backref="public_category_tasks", null=False, on_delete="CASCADE")
     created_by = pw.ForeignKeyField(User, backref="user_created_tasks", on_delete="CASCADE")
- 
+
     def validate(self):
         if len(self.name) == 0:
             self.errors.append('Name is empty')

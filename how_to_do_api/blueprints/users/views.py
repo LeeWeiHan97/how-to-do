@@ -1,4 +1,4 @@
-from app import app
+from app import app, celery, scheduled_task_notification
 from flask import jsonify, request, Blueprint
 from flask_jwt_extended import (jwt_required, create_access_token, get_jwt_identity)
 from models.user import User
@@ -9,30 +9,15 @@ from models.private_task import PrivateTask
 from models.public_category import PublicCategory
 from models.task import Task
 from models.scheduled_task import Scheduled
-from pyfcm import FCMNotification
 import os
 from datetime import datetime, timedelta, date, time
 import calendar
 import json, requests
-
+from helpers.noti import notification
 
 users_api_blueprint = Blueprint('users_api',
                              __name__,
                              template_folder='templates')
-
-push_service = FCMNotification(api_key=os.environ.get("FCM_API_KEY"))
-
-    def notification(registrationId, title, body):
-        registration_id = registrationId
-        message_title = title
-        message_body = body
-        if type(registrationId) == str:
-            result = push_service.notify_single_device(registration_id=registration_id, message_title=message_title, message_body=message_body)
-        elif type(registrationId) == list:
-            result = push_service.notify_multiple_devices(registration_ids=registration_id, message_title=message_title, message_body=message_body)
-        else:
-            raise Exception('registration id should be a string or a list of strings')
-
 
 def add_months(sourcedate, months):
     month = sourcedate.month - 1 + months
@@ -154,7 +139,7 @@ def me():
             "room id": str(user.room_id),
             "is_admin": user.is_admin
         }
-    
+
     return jsonify (response)
 
 
@@ -218,7 +203,7 @@ def get_public_task(public_category_id):
                 "is completed": task.is_completed
             } for task in tasks
         ]
-    
+
     else:
         response = {
             "status": "failed",
@@ -306,6 +291,7 @@ def user(user_id):
 
     if user:
         response = {
+            "status": "success",
             "id": str(user.id),
             "username": user.username,
             "email": user.email,
@@ -315,13 +301,13 @@ def user(user_id):
             "status": "failed",
             "error": "User not found"
         }
-    
+
     return jsonify (response)
 
 
 @users_api_blueprint.route('/edit', methods=['POST'])
 @jwt_required
-def edit():  
+def edit():
     username = request.json.get('username')
     email = request.json.get('email')
     current_user_id = get_jwt_identity()
@@ -412,7 +398,7 @@ def new_room():
             }
 
         return jsonify (response)
-        
+
     else:
         response = {
             "status": "failed",
@@ -605,7 +591,7 @@ def delete_public_task():
     response = {
         "status": "successfully deleted"
     }
-    
+
     return jsonify (response)
 
 
@@ -678,7 +664,7 @@ def add():
                     "status": "success",
                     "users in room": users_in_room
                 }
-            
+
             else:
                 response = {
                     "status": "failed",
@@ -686,7 +672,7 @@ def add():
                 }
 
             return jsonify (response)
-        
+
         else:
             response = {
                 "status": "failed",
@@ -701,8 +687,7 @@ def add():
             "error": "You are not the admin!"
         }
 
-    return jsonify (response)  
-
+    return jsonify (response)
 
 @users_api_blueprint.route('/new_scheduled', methods=['POST'])
 @jwt_required
@@ -715,7 +700,8 @@ def new_scheduled():
     repeat_on = request.json.get('repeat_on')
     repeat_for = int(request.json.get('repeat_for'))
     roomID = user.room_id
-
+    
+    registration_id = user.android_token
 
     if repeat_by == "weekly":
         data_source = []
@@ -723,6 +709,7 @@ def new_scheduled():
         while i < repeat_for:
             add_data = {"name": name, "date_time": date_time, "room_id": roomID, "repeat_by": repeat_by, "repeat_on": repeat_on}
             data_source.append(add_data)
+            scheduled_task_notification.apply_async(kwargs={'registration_id': registration_id},countdown=(date_time - datetime.now()).total_seconds())
             date_time += timedelta(days = 7)
             i = i + 1
 
@@ -736,6 +723,7 @@ def new_scheduled():
         while i < repeat_for:
             add_data = {"name": name, "date_time": date_time, "room_id": roomID, "repeat_by": repeat_by, "repeat_on": repeat_on}
             data_source.append(add_data)
+            scheduled_task_notification.apply_async(kwargs={'registration_id': registration_id},countdown=(date_time - datetime.now()).total_seconds())
             date_time = add_months(date_time,1)
             i = i + 1
 
@@ -805,7 +793,7 @@ def geolocation():
     public_categories = PublicCategory.select()
     
     for category in public_categories:
-        if category.task == "Grocery":
+        if (category.task == "Grocery" or category.task == "Groceries" or category.task == "grocery" or category.task == "groceries"):
             url = 'https://api.foursquare.com/v2/venues/search'
 
             params = dict(
@@ -815,7 +803,7 @@ def geolocation():
             ll=f'{latitude},{longitude}',
             query='grocery',
             limit=5,
-            radius=200
+            radius=10000
             )
             resp = requests.get(url=url, params=params)
             data = json.loads(resp.text)
@@ -844,7 +832,7 @@ def assign():
     user_incharge_id = user_incharge.id
     # user_incharge_id = int(request.json.get('user_incharge_id'))
     task_id = int(request.json.get('task_id'))
-    
+
     task = Scheduled.get_or_none(Scheduled.id == task_id)
 
     if task:
@@ -934,3 +922,4 @@ def assignroundrobin():
         }
 
     return jsonify (response)
+
